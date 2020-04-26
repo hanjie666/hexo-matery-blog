@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="utf-8"?>
+<search> 
+  
+  
+    
+    <entry>
+      <title>hexo部署到vps</title>
+      <link href="/posts/6e392398/"/>
+      <url>/posts/6e392398/</url>
+      
+        <content type="html"><![CDATA[<h3 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h3><p>最近把博客主题从next换到matery，然后先把博客部署到阿里云去，然后就去百度找了很多教程，都不成功，于是我决定翻墙去google找找，结果看了第一篇文章就成功部署好了，不得不说google搜索引擎确实好用点！！！</p><h3 id="Git-Hooks-自动部署"><a href="#Git-Hooks-自动部署" class="headerlink" title="Git Hooks 自动部署"></a>Git Hooks 自动部署</h3><h4 id="原理"><a href="#原理" class="headerlink" title="原理"></a>原理</h4><p>我们在本地编辑文本，然后使用 Git 远程部署到 VPS 的 Git 仓库。<code>hexo d</code> 命令实际上只 deploy 了本地的 public 文件夹，Git Hooks 实际上就是当 Git 仓库收到最新的 push 时，将 Git 仓库接受到的内容复制到 VPS 上的网站目录内。相当于完成了手动将 public 文件夹复制到 VPS 的网站根目录里。</p><h3 id="环境准备"><a href="#环境准备" class="headerlink" title="环境准备"></a>环境准备</h3><p>阿里云服务器(需要开放80端口)+本地装好的hexo博客+xshell远程连接工具</p><h4 id="安装git"><a href="#安装git" class="headerlink" title="安装git"></a>安装git</h4><pre><code>yum install git //安装gitgit --version  //查看git版本</code></pre><h4 id="创建-git-用户"><a href="#创建-git-用户" class="headerlink" title="创建 git 用户"></a>创建 git 用户</h4><p>执行：<code>adduser git</code>，根据提示设置密码。</p><h4 id="赋予-git-用户-sudo-权限"><a href="#赋予-git-用户-sudo-权限" class="headerlink" title="赋予 git 用户 sudo 权限"></a>赋予 git 用户 sudo 权限</h4><pre><code>chmod 740 /etc/sudoersvim /etc/sudoers</code></pre><p>然后找到以下内容</p><pre><code># User privilege specificationroot    ALL=(ALL:ALL)   ALL</code></pre><p>在<code>root    ALL=(ALL:ALL)   ALL</code>下面添加</p><pre><code>git     ALL=(ALL:ALL)   All</code></pre><p>保存退出后修改回文件权限</p><pre><code>chmod 440 /etc/sudoers</code></pre><h4 id="关闭git用户shell权限"><a href="#关闭git用户shell权限" class="headerlink" title="关闭git用户shell权限"></a>关闭git用户shell权限</h4><p>执行</p><pre><code>vim /etc/passwd</code></pre><p>将最后一行的 </p><p><code>git:x:1001:1001:,,,:/home/git:/bin/bash</code></p><p> 修改为</p><p> <code>git:x:1001:1001:,,,:/home/git:/usr/bin/git-shell</code></p><p><strong>这样，git 用户可以正常通过 ssh 使用 git，但无法登录 shell，因为我们为 git 用户指定的 git-shell 每次一登录就自动退出</strong>。</p><h4 id="初始化-git-仓库"><a href="#初始化-git-仓库" class="headerlink" title="初始化 git 仓库"></a>初始化 git 仓库</h4><pre><code>cd /home/git                //切换到git用户目录mkdir blog.git              //创建git仓库文件夹，以blog.git为例cd blog.git                 //进入仓库目录git init --bare             //使用--bare参数初始化为裸仓库，这样创建的仓库不包含工作区</code></pre><h4 id="创建网站目录"><a href="#创建网站目录" class="headerlink" title="创建网站目录"></a>创建网站目录</h4><pre><code>cd /var/www/                //切换目录（这个目录可以自己指定）mkdir blog                  //创建网站目录，以blog为例</code></pre><h4 id="配置-SSH"><a href="#配置-SSH" class="headerlink" title="配置 SSH"></a>配置 SSH</h4><pre><code>cd /home/git                //切换到git用户目录mkdir .ssh                  //创建.ssh目录cd .sshvim authorized_keys</code></pre><p>然后将本地的公钥复制到 <code>authorized_keys</code> 文件里 (公钥即本地执行 <code>cat ~/.ssh/id_rsa.pub</code> 查看的内容)。</p><p>最好本地重新生成一次公钥</p><p>执行<code>ssh-keygen -t rsa -C&quot;yourEmail@xxx.com&quot;</code></p><p>然后生成后再执行``cat ~/.ssh/id_rsa.pub` 查看生成的内容</p><p>复制公钥粘贴到<code>authorized_keys</code>文件内然后保存退出</p><h4 id="测试SSH连接"><a href="#测试SSH连接" class="headerlink" title="测试SSH连接"></a>测试SSH连接</h4><p>本地打开cmd或者git bash here，然后执行<code>ssh git@VPS的ip</code>，提示要输入yes，然后输入之后不用输入密码直接可以连接成功，说明这步就没问题了。</p><h4 id="用户组管理"><a href="#用户组管理" class="headerlink" title="用户组管理"></a>用户组管理</h4><pre><code>ll /home/git/ll /var/www/</code></pre><p>确保 <code>blog.git</code>、<code>.ssh</code>、<code>blog</code> 目录的用户组权限为 <code>git:git</code>，若不是，执行下列命令：</p><pre><code>chown -R git:git /home/git/blog.git/chown -R git:git /home/git/.ssh/chown -R git:git /var/www/blog/</code></pre><h3 id="配置-Git-Hooks"><a href="#配置-Git-Hooks" class="headerlink" title="配置 Git Hooks"></a>配置 Git Hooks</h3><h4 id="创建-post-receive-文件"><a href="#创建-post-receive-文件" class="headerlink" title="创建 post-receive 文件"></a>创建 post-receive 文件</h4><pre><code>cd /home/git/blog.git/hooks     //切换到hooks目录下vim post-receive            //创建文件</code></pre><p>复制下面的内容到 <code>post-receive</code> 文件中：</p><pre><code>#!/bin/bashecho &quot;post-receive hook is running...&quot;GIT_REPO=/home/git/blog.gitTMP_GIT_CLONE=/tmp/blogPUBLIC_WWW=/var/www/blogrm -rf ${TMP_GIT_CLONE}git clone $GIT_REPO $TMP_GIT_CLONErm -rf ${PUBLIC_WWW}/*cp -rf ${TMP_GIT_CLONE}/* ${PUBLIC_WWW}</code></pre><p>赋予可执行权限：</p><pre><code>chmod +x post-receive</code></pre><h3 id="本地推送"><a href="#本地推送" class="headerlink" title="本地推送"></a>本地推送</h3><h4 id="配置hexo"><a href="#配置hexo" class="headerlink" title="配置hexo"></a>配置hexo</h4><p>打开本地博客根目录下的<code>_config.yml</code> 文件，找到最后的 deploy 配置，修改为：</p><pre><code># Deployment## Docs: https://hexo.io/docs/deployment.htmldeploy:    type: git    # repo: git@VPS IP:/~/blog.git  # 默认端口生效使用    # repo: ssh://git@VPS IP:端口/~/blog.git # 默认端口不生效使用，设置端口    branch: master</code></pre><h4 id="推送到vps"><a href="#推送到vps" class="headerlink" title="推送到vps"></a>推送到vps</h4><pre><code>hexo clean &amp;&amp; hexo g &amp;&amp; hexo d</code></pre><h4 id="检测是否成功"><a href="#检测是否成功" class="headerlink" title="检测是否成功"></a>检测是否成功</h4><pre><code>cd /var/www/blogls</code></pre><p>如果文件夹里成功出现本地推送的文件，那么恭喜你基本上算是成功了。</p><h3 id="配置nginx"><a href="#配置nginx" class="headerlink" title="配置nginx"></a>配置nginx</h3><p>这里配置的方法有很多种，可以直接安装，也可以使用docker安装，或者使用宝塔一键安装，安装完成后直接把网站运行目录设置成<code>/var/www/blog</code>,然后访问你的网站就大功告成！！！</p><h3 id="问题解决"><a href="#问题解决" class="headerlink" title="问题解决"></a>问题解决</h3><h4 id="推送问题"><a href="#推送问题" class="headerlink" title="推送问题"></a>推送问题</h4><p>推送的时候可能会出现没有删除权限问题</p><p>执行<code>cd /var/www/blog</code>然后 执行<code>chmod 777 .</code></p><p>就可以解决了</p>]]></content>
+      
+      
+      <categories>
+          
+          <category> hexo </category>
+          
+      </categories>
+      
+      
+        <tags>
+            
+            <tag> hexo </tag>
+            
+        </tags>
+      
+    </entry>
+    
+    
+    
+    <entry>
+      <title>每日低保项目无需人头</title>
+      <link href="/posts/c39b6595/"/>
+      <url>/posts/c39b6595/</url>
+      
+        <content type="html"><![CDATA[<h3 id="项目名称"><a href="#项目名称" class="headerlink" title="项目名称"></a>项目名称</h3><h6 id="星事物"><a href="#星事物" class="headerlink" title="星事物"></a>星事物</h6><h3 id="利润"><a href="#利润" class="headerlink" title="利润"></a>利润</h3><p>新用户注册送2.3星币基本上然后每天什么都不用干，自己上去签到一下就完事了 低保即可（手动领取星币）每天签到送0.3星币，1星币分红0.19+（只是目前的加个）</p><h3 id="下载注册入口（微信打开）"><a href="#下载注册入口（微信打开）" class="headerlink" title="下载注册入口（微信打开）"></a>下载注册入口（微信打开）</h3><p><a href="http://app.dingyinet.com.cn/?i=609184b2dff3dec336c4ddbb1b96374e" target="_blank" rel="noopener">点我下载</a></p><h3 id="项目图片"><a href="#项目图片" class="headerlink" title="项目图片"></a>项目图片</h3><p><img src="https://i.loli.net/2020/04/25/wP7zChuTrItL9bs.png" alt="IMG_3381.png"></p><p><img src="https://i.loli.net/2020/04/25/utXFhbBg8mvMY47.png" alt="https://i.loli.net/2020/04/25/utXFhbBg8mvMY47.png"></p><h3 id="结语"><a href="#结语" class="headerlink" title="结语"></a>结语</h3><p><strong>每天啥都不用干 上去签一下到如果想赚多一点  拉朋友也可以的</strong></p><p><strong>一个人不拉 每天浪费30秒时间签到一下</strong> </p><p><strong>一个月低保35元  新手0.3提现！</strong></p><p><strong>这难道不比那些养猫🐱养狗🐶好的多吗？那玩意收益看不见不说，还有那虚无缥缈的分红猫狗😂</strong></p><p><strong>但是这个收益是实时到帐，而且提现门槛也低！</strong></p><p><strong>为什么不搞一波呢？反正0投资有什么损失？</strong></p><p><strong>有任何问题咨询微信：TY-YOO</strong></p>]]></content>
+      
+      
+      <categories>
+          
+          <category> Money </category>
+          
+      </categories>
+      
+      
+        <tags>
+            
+            <tag> Money </tag>
+            
+        </tags>
+      
+    </entry>
+    
+    
+    
+    <entry>
+      <title>docker安装使用</title>
+      <link href="/posts/37bbee8b/"/>
+      <url>/posts/37bbee8b/</url>
+      
+        <content type="html"><![CDATA[<h3 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h3><p>学习到docker，记录下方便以后查看</p><a id="more"></a><h3 id="操作系统"><a href="#操作系统" class="headerlink" title="操作系统"></a>操作系统</h3><p>使用VirtualBox虚拟机 + CentOS7系统</p><h3 id="安装docker"><a href="#安装docker" class="headerlink" title="安装docker"></a>安装docker</h3><p>首先最好更新下软件包跟内核</p><pre><code>yum update</code></pre><p>安装docker</p><pre><code>yum install docker</code></pre><p>启动docker</p><pre><code>systemctl start docker.service</code></pre><p>将docker设置为开机启动</p><pre><code>systemctl enable docker</code></pre><h3 id="更改docker镜像，加快下载速度"><a href="#更改docker镜像，加快下载速度" class="headerlink" title="更改docker镜像，加快下载速度"></a>更改docker镜像，加快下载速度</h3><p>1.创建daemon.json文件</p><pre><code>vim /etc/docker/daemon.json</code></pre><p>2.复制阿里云镜像粘贴在daemon.json文件</p><pre><code>{ &quot;registry-mirrors&quot;:[&quot;https://6kx4zyno.mirror.aliyuncs.com&quot;]}</code></pre><p>3.重启docker</p><pre><code>systemctl daemon-reload systemctl restart docker</code></pre><h3 id="docker安装mysql"><a href="#docker安装mysql" class="headerlink" title="docker安装mysql"></a>docker安装mysql</h3><p>1.搜索镜像</p><pre><code>docker search mysql</code></pre><p>2.拉取镜像</p><pre><code>docker pull mysql指定版本docker pull mysql:5.7</code></pre><p>3.查看镜像</p><pre><code>docker images</code></pre><p>4.运行镜像</p><pre><code>docker run --name mysql（自定义容器名） -d(后台运行) images-name(指定镜像模板)</code></pre><p>5.查看运行中的容器</p><pre><code>docker ps</code></pre><p>6.停止容器</p><pre><code>docker stop 容器id</code></pre><p>7.启动容器</p><pre><code>docker start 容器id</code></pre><p>8.删除容器</p><pre><code>docker rm [IMAGE ID]</code></pre><p>9.删除镜像</p><pre><code>docker rmi [IMAGE ID]</code></pre><p>10.启动一个做了端口映射的tomcat</p><pre><code>docker run -d -p 8888:8080 tomcat-d：后台运行-p: 将主机的端口映射到容器的一个端口    主机端口:容器内部的端口</code></pre><p>11.查看容器的日志</p><pre><code>docker logs container-name/container-id</code></pre><h3 id="MySql部署"><a href="#MySql部署" class="headerlink" title="MySql部署"></a>MySql部署</h3><p>1.拉取MySQL镜像，我这里选择5.7版本</p><pre><code>docker pull mysql:5.7</code></pre><p>2.创建容器</p><pre><code>docker run -p 3306:3306 --name mysql02 -e MYSQL_ROOT_PASSWORD=123456 -d mysql:5.7</code></pre><p>-p:端口映射，格式为 宿主机映射端口:容器运行端口</p><p>-e:添加环境变量</p><p>-d:后台运行</p><p>MYSQL_ROOT_PASSWORD:设置root用户的登录密码</p><p>3.远程连接宿主机的ip，指定端口号为3306，用户名root，密码123456</p><h3 id="tomcat部署"><a href="#tomcat部署" class="headerlink" title="tomcat部署"></a>tomcat部署</h3><p>1.拉取镜像</p><pre><code>docker pull tomcat</code></pre><p>2.创建挂载目录</p><pre><code>mkdir -p /mnt/tomcat</code></pre><p>3.创建容器</p><pre><code>docker run -d --name tomcat_tool -p 8080:8080 -v /mnt/tomcat/webapps:/usr/local/tomcat/webapps --privileged=true a7fa4ac97be4（镜像id）</code></pre>]]></content>
+      
+      
+      <categories>
+          
+          <category> docker </category>
+          
+      </categories>
+      
+      
+        <tags>
+            
+            <tag> docker </tag>
+            
+        </tags>
+      
+    </entry>
+    
+    
+  
+  
+</search>
